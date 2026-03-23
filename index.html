@@ -61,6 +61,9 @@
       .hamburger { display: block !important; cursor: pointer; font-size: 24px; }
     }
     .hamburger { display: none; }
+.messages {
+  scroll-behavior: smooth;
+}
   </style>
 </head>
 <body>
@@ -143,13 +146,10 @@ Redes y Ciberespacio</button>
 <div class="input-area" id="inputArea" style="display:none;">
   <input type="file" id="file-input" accept="image/*" style="display:none;" />
   <button type="button" onclick="document.getElementById('file-input').click()" style="background:#444; color:white; border:none; border-radius:25px; padding:0 15px; cursor:pointer;">📎</button>
-  
   <input type="text" id="user-input" placeholder="Escribe o adjunta un documento..."/>
-  <button class="send" id="sendBtn">Enviar</button>
-</div>
+  <button class="send" id="sendBtn" onclick="window.enviarMensaje()">Enviar</button>
 
-
-<script type="module">
+</div> <script type="module">
 import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm@0.2.79";
 
 // 1. FUNCIONES DE NAVEGACIÓN (Expuestas globalmente)
@@ -166,32 +166,41 @@ window.closeIA = function() {
 const fileInput = document.getElementById("file-input");
 
 // 2. CORRECCIÓN DE REFERENCIA EN OCR
-// En tu código original, userInput no estaba definido dentro de fileInput.onchange
+
 fileInput.onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const userInput = document.getElementById("user-input"); // Asegurar referencia
+
   const msgDiv = document.getElementById("messages");
-  
   const tempMsg = document.createElement("div");
   tempMsg.className = "message bot";
-  tempMsg.style.borderLeft = "4px solid #ff9800"; 
-  tempMsg.innerHTML = "🔍 <b>Analizando documento...</b>";
+  tempMsg.innerHTML = `⌛ Procesando: ${file.name}...`;
   msgDiv.appendChild(tempMsg);
 
   try {
-    const result = await Tesseract.recognize(file, 'spa');
-    const textoExtraido = result.data.text.trim();
-    if (textoExtraido.length > 0) {
-      userInput.value = `Analizá este texto: "${textoExtraido}"`;
-      tempMsg.innerHTML = "✅ <b>Documento leído.</b>";
+    if (file.type.startsWith("image/")) {
+      const result = await Tesseract.recognize(file, 'spa');
+      userInput.value = "Analizá este texto de imagen: " + result.data.text;
+      tempMsg.remove();
+      window.enviarMensaje();
+    } 
+    else if (file.name.endsWith(".txt")) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => { 
+        userInput.value = "Analizá este documento: " + ev.target.result;
+        tempMsg.remove();
+        window.enviarMensaje();
+      };
+      reader.readAsText(file);
+    } 
+    else {
+      tempMsg.innerHTML = "❌ Formato no soportado.";
     }
   } catch (err) {
-    tempMsg.innerHTML = "❌ Error en OCR.";
+    tempMsg.innerHTML = "❌ Error al leer el archivo.";
   }
+  fileInput.value = ""; 
 };
-
-// Inicializar eventos al cargar
 
 const startup = document.getElementById("startup");
 const mainUI = document.getElementById("mainUI");
@@ -274,7 +283,6 @@ startBtn.onclick = async () => {
       mainUI.classList.add("visible");
       inputArea.style.display = "flex";
       cambiarBot("matematicas");
-attachEvents();
     }, 1500);
   } catch (err) {
     progressText.innerHTML = `Error: ${err.message || err}<br>Recarga o usa Chrome/Edge actualizado.<br>Dime el error si persiste.`;
@@ -327,7 +335,7 @@ function cambiarBot(id) {
   msgDiv.scrollTop = msgDiv.scrollHeight;
 
   sidebar.classList.remove("active");
-  setTimeout(attachEvents, 300);
+setTimeout(attachEvents, 100);
 }
 
 async function enviarMensaje() {
@@ -384,7 +392,8 @@ async function enviarMensaje() {
     respuestaDiv.innerHTML = "<span style='color:#ff5555;'>❌ Error al generar respuesta. La GPU podría estar saturada o sin memoria.</span>";
   }
 }
-
+// Exponer funciones al scope global
+window.enviarMensaje = enviarMensaje;
 attachEvents();
 </script>
 </body>
